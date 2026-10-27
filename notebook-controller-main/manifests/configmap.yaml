@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: notebook-controller-config
+  namespace: notebook-controller-system
+data:
+  CULL_IDLE_TIME: '10'
+  ENABLE_CULLING: 'true'
+  IDLENESS_CHECK_PERIOD: '1'
+  ISTIO_GATEWAY: notebook-controller-system/nb-controller
+  USE_ISTIO: 'false'
+  CLUSTER_DOMAIN: cluster.local
+  ISTIO_CLUSTER_DOMAIN: cluster.local

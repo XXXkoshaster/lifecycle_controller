@@ -1,0 +1,81 @@
+before_script:
+  - echo "start job at :" `date`
+  - echo "workspace is:" `pwd`
+
+after_script:
+  - echo "done job at :" `date`
+
+stages:
+  - test
+  - build
+  - push
+  - release
+
+variables:  
+  CONTAINER_REGISTRY: $NEXUS_REGISTRY_HOST/ais/$CI_PROJECT_NAME
+  
+
+syntaxcheck:
+  stage: test
+  image: golang:1.19
+  script:
+    - go mod download
+    - gofmt ./
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+code_intelligence_go:
+  stage: test
+  image: sourcegraph/lsif-go:v1
+  script:
+    - go mod download
+    - lsif-go
+  artifacts:
+    reports:
+      lsif: dump.lsif
+    expire_in: 1 day
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+build:
+  stage: build
+  before_script:
+    - docker login -u $NEXUS_REGISTRY_USERNAME -p $NEXUS_REGISTRY_PASSWORD $NEXUS_REGISTRY_HOST
+  script:
+    - docker build
+      --pull
+      --cache-from $CONTAINER_REGISTRY:latest
+      --tag $CONTAINER_REGISTRY:$CI_COMMIT_SHORT_SHA .
+    - docker push $CONTAINER_REGISTRY:$CI_COMMIT_SHORT_SHA
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && 
+          $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+push-image-latest:
+  variables:
+    GIT_STRATEGY: none
+  stage: push
+  needs:
+    - build
+  before_script:
+    - docker login -u $NEXUS_REGISTRY_USERNAME -p $NEXUS_REGISTRY_PASSWORD $NEXUS_REGISTRY_HOST
+  script:
+    - docker pull $CONTAINER_REGISTRY:$CI_COMMIT_SHORT_SHA
+    - docker tag $CONTAINER_REGISTRY:$CI_COMMIT_SHORT_SHA $CONTAINER_REGISTRY:latest
+    - docker push $CONTAINER_REGISTRY:latest
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && 
+          $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+release-image-tag:
+  stage: release
+  variables:
+    GIT_STRATEGY: none
+  before_script:
+    - docker login -u $NEXUS_REGISTRY_USERNAME -p $NEXUS_REGISTRY_PASSWORD $NEXUS_REGISTRY_HOST
+  script:
+    - docker pull $CONTAINER_REGISTRY:latest
+    - docker tag $CONTAINER_REGISTRY:latest $CONTAINER_REGISTRY:$CI_COMMIT_TAG
+    - docker push $CONTAINER_REGISTRY:$CI_COMMIT_TAG
+  only:
+    - tags

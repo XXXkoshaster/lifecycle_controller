@@ -1,0 +1,15 @@
+apiVersion: kubeflow.org/v1beta1
+kind: Notebook
+metadata:
+  name: "test"
+  namespace: "default"
+  labels:
+    app: "test"
+  annotations:
+    notebooks.kubeflow.org/server-type: "jupyter"
+spec:
+  template:
+    spec:
+      containers:
+        - name: "test"
+          image: public.ecr.aws/j1r0q0g6/notebooks/notebook-servers/jupyter-scipy:v1.5.0
